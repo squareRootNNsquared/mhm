@@ -26,8 +26,8 @@ This program is entirely dependent on the use of email and the corresponding SMT
 
 		Known Bug	[1]	Will log most recent input (perhaps again) when program is started.
 
-		Warning	[1]	Reports close (>1s) in time proximity to a recent report may be ignored.
-		Warning [2] Data plotted with order corresponding to log.
+		Warning		[1]	Reports close (>1s) in time proximity to a recent report may be ignored.
+		Warning		[2]	Data plotted with order corresponding to log.
 
 
 
