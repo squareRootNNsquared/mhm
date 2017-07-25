@@ -7,6 +7,8 @@ This is a program in a python script that assists in the monitoring of an indivi
 
 This program is entirely dependent on the use of email and the corresponding SMTP and IMAP protocols.
 
+MHM.py is the primary module, MHM_PAR.py is the referenced parameter file.
+
 
 
 ### Important Notes/Warnings Regarding Usage (INRU)
