@@ -33,6 +33,6 @@ dataRecipient	=	""
 plotTimeRange	=	10
 
 ### Weight goal
-M_goal = 135.0
+M_goal = 0.0
 # NOT IN USE -- An amount to add or subtract from goal
-M_tolerance = 5.0
+M_tolerance = 0.0
