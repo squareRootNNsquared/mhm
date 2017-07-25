@@ -63,20 +63,10 @@ from datetime import timedelta as d
 ###
 ### Initialize necessary values
 ###
+import MHM_PAR as par
 latestEmail_time	=	0
 emailTimeKeeper		=	0
 initialTimeStamp	=	t.time()
-timeRange			=	10	# Time amount [days] to plot
-
-### Define email account
-userDefined = 1
-if (userDefined == 1) :
-	em_imap 	= 	str(raw_input("Please enter IMAP server address (gmail's is imap.gmail.com):\n"))
-	em_smtp		=	str(input("Please enter SMTP server address (gmail's is smtp.gmail.com):\n"))
-	em_smtpPort	=	raw_input("Please enter SMTP port (gmail's is 587):\n")
-	em_ac 		=	str(raw_input("Please enter email address corresponding to account:\n"))
-	em_pw 		=	str(raw_input("Lastly, please enter email account password:\n"))
-	dataRecipient		=	em_ac
 
 ###
 ### Define Important Functions
@@ -90,9 +80,9 @@ def sendEmail(subject,messageBody,recipient,imagePath):
 	###
 	###	Sends an email.
 	###
-	### From out of scope accepts em_ac : sending account email address,
-	###	em_pw : email password, em_smtp : SMTP server, em_smtpPort : SMTP port,
-	###	em_imap : IMAP server.
+	### From out of scope accepts par.em_ac : sending account email address,
+	###	par.em_pw : email password, par.em_smtp : SMTP server, par.em_smtpPort : SMTP port,
+	###	par.em_imap : IMAP server.
 	###
 	###	Text messages may be sent via email. To do so,
 	###	in place of the recipient, store the number 
@@ -133,7 +123,7 @@ def sendEmail(subject,messageBody,recipient,imagePath):
 		### Taxonomical Logistics
 		subjectPrepend 	= ""
 		subjectAppend	= ""
-		fromaddr = "%s"%(em_ac)
+		fromaddr = par.em_ac
 		toaddr = recipient
 		msg = MIMEMultipart()
 		msg['From'] = fromaddr
@@ -142,7 +132,7 @@ def sendEmail(subject,messageBody,recipient,imagePath):
 		
 		###	Core Message Construction
 		if (phone == 0):
-			signature =	""+"\n\n[[ This message was sent by MHM ]]"
+			signature =	""+"\n\n[[ This message was sent by your fridge, it says you need to pick up some milk. ]]"
 		if (phone == 1):
 			signature =	""
 		body = messageBody + signature
@@ -159,9 +149,9 @@ def sendEmail(subject,messageBody,recipient,imagePath):
 			msg.attach(img)
 		
 		### Digital Logistics
-		server = smtplib.SMTP('em_smtp', eval(em_smtpPort))
+		server = smtplib.SMTP(par.em_smtp, eval(par.em_smtpPort))
 		server.starttls()
-		server.login(fromaddr, "%s"%(em_pw))
+		server.login(fromaddr, par.em_pw)
 		text = msg.as_string()
 		server.sendmail(fromaddr, toaddr, text)
 		server.quit()
@@ -181,8 +171,8 @@ def getFirstTextBlock(self, email_message_instance):
 while 1:
 
 	###	Log into inbox of mailbox
-	MHM_mail = imaplib.IMAP4_SSL(em_imap)
-	MHM_mail.login(em_ac,em_pw)
+	MHM_mail = imaplib.IMAP4_SSL(par.em_imap)
+	MHM_mail.login(par.em_ac,par.em_pw)
 	MHM_mail.list()
 	MHM_mail.select("inbox")
 
@@ -198,17 +188,17 @@ while 1:
 	latestEmail_body 	= 	getFirstTextBlock('',latestEmail)
 	latestEmail_time	=	t.mktime(email.utils.parsedate(latestEmail['Date']))
 
-	###	Abstract from latest email if not abstracted (handled with time)
+	###	Abstract from latest email if not abstracted
 	if (latestEmail_time > emailTimeKeeper) :
 		emailTimeKeeper = latestEmail_time
 		data = latestEmail_body.split(" ")
 		for i in range(0,len(data)):
 
 			###
-			###	MHMM operation
+			###	MHM_M operation
 			###
 
-			### If M[number] in retrieved data
+			### If M value in retrieved data
 			if ("R~M" in str(data[i])) :
 				
 				###	Process
@@ -225,42 +215,41 @@ while 1:
 				### Define data
 				MHM_log_M	=	open("%s/MHM_log_M.txt"%(path()),"r")
 				M,time	=	np.loadtxt(MHM_log_M , delimiter="\t" , usecols=(0,1), unpack=True)
-
-				### Build plotting object
 				timeFmtd  = []
-				if not isinstance(time, list):
+				if isinstance(time, np.float64):
 					item = time
 					time = []
 					time.append(item)
 				for j in range(0,len(time)) :
 					timeFmtd.append(dt.datetime.fromtimestamp(time[j]))
+
+				### Build plotting object
 				saved,drawn = plt.subplots()
 				drawn.plot(timeFmtd , M , label='Earthly Gravitational Force [lbs]')
 
 				### Format
-
 				# Major, minor tick marks
 				daily = dates.DayLocator()
 				hourly = aml()
-				dailyFormat = dates.DateFormatter('%d')
+				dailyFormat = dates.DateFormatter('%Y %b %d')
 				drawn.xaxis.set_major_locator(daily)
 				drawn.xaxis.set_major_formatter(dailyFormat)
 				drawn.xaxis.set_minor_locator(hourly)
-
 				# Plot time range
 				today = dt.datetime.now()
-				prior = today - d(days=10)
+				prior = today - d(days=par.plotTimeRange)
 				timeMax = dt.date(today.year , today.month , today.day)
 				timeMin = dt.date(prior.year , prior.month , prior.day)
 				drawn.set_xlim(timeMin,timeMax)
-
 				# Tick mark labels
 				saved.autofmt_xdate()
-
 				# Legend and axes
 				plt.legend(loc='best', fancybox=True, framealpha=.5)
 				plt.xlabel('Date [day]')
 				plt.ylabel('Macroscopic Health Monitoring')
+
+				### Draw weight goal
+				plt.axhline(linewidth=50 , y=par.M_goal , color='#00ff00', alpha=0.5)
 
 				### Save drawn image and clear drawing frame
 				plt.savefig('%s/MHM_plot_M.png'%(path()))
@@ -269,16 +258,9 @@ while 1:
 
 			### If data request in retrieved data, send plot ###
 			if ("RD~M" in str(data[i])):
-				sendEmail("MHM Plot Delivery","M[T]",dataRecipient,"%s/MHM_plot_M.png"%(path()))
+				sendEmail("MHM Plot Delivery","M[T]",par.dataRecipient,"%s/MHM_plot_M.png"%(path()))
 
-	### Designate operation frequency
+	### End Of Routine operations
 	t.sleep(5)
 	print "[ MHM Operating ][ Uptime = %fhours ]"%((t.time()-initialTimeStamp)/(60*60))
-
-	###
-	###	Features to add:
-	###
-	### 	-	Derived plots of useful calculations
-	###		-	Goal lines
-	###		-	Add [Software Redundancy]
-	###
+	par = reload(par)
