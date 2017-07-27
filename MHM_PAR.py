@@ -34,5 +34,6 @@ plotTimeRange	=	10
 
 ### Weight goal
 M_goal = 0.0
-# NOT IN USE -- An amount to add or subtract from goal
-M_tolerance = 0.0
+
+### Range of days use to calculate time derivative of M
+dM_dayRange = 3
