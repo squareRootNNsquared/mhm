@@ -11,6 +11,8 @@
 ###	This program is entirely dependent on the use of email
 ###	and the corresponding SMTP and IMAP protocols
 ###
+###	MHM.py is the primary module, MHM_PAR.py is the 
+###	referenced parameter file.
 
 ###
 ### Important Notes/Warnings Regarding Usage (INRU)
@@ -58,7 +60,8 @@ import matplotlib.pylab as pl
 import matplotlib.dates as dates
 from matplotlib.ticker import AutoMinorLocator as aml
 import datetime as dt
-from datetime import timedelta as d
+from datetime import timedelta as dtd
+
 
 ###
 ### Initialize necessary values
@@ -71,6 +74,40 @@ initialTimeStamp	=	t.time()
 ###
 ### Define Important Functions
 ###
+
+def d(list_a,list_b,index,secToDay):
+	###
+	###	Calculates the derivative of _a with respect to _b at specified index via
+	###	the changes of both from index provided less one to index provided.
+	###
+	### Thus, for i representing the index, calculated is (da/di)/(db/di), however
+	###	the change in i, di, is unity in both ratios thus da/db is calculated.
+	###
+	###		Notes
+	###
+	###		If an index is not obtainable a value of zero is returned indicating that 
+	###		no change is calculable at the index provided.
+	###
+	###		If secToDay is set to 1, b is assumed to be of the dimension of time in
+	###		the SI unit of seconds, and will be converted to the unit of days.
+	###
+	###		A return of 999.321 indicates an index handling error and data is invalid.
+	###
+	try :
+		if ((index-1) >= 0) :
+			if (secToDay != 1) :
+				d = (list_a[index]-list_a[index-1])/(list_b[index]-list_b[index-1])
+			if (secToDay == 1) :
+				d = (list_a[index]-list_a[index-1])/( (list_b[index]-list_b[index-1])/(60*60*24) )
+		if ((index-1) < 0) :
+			d = 999.321
+	except IndexError :
+		d = 999.321
+	return d
+
+def maxIndex(list):
+	### Returns largest list index and the last list index
+	return (len(list)-1)
 
 def path():
 	### Returns current directory in string format
@@ -201,7 +238,7 @@ while 1:
 			### If M value in retrieved data
 			if ("R~M" in str(data[i])) :
 				
-				###	Process
+				###	Data Acquisition
 				data_M = eval(data[i].strip("R~M"))
 				data_M = float(data_M)
 				MHM_log_M	=	open("%s/MHM_log_M.txt"%(path()),"a+")
@@ -209,47 +246,87 @@ while 1:
 				MHM_log_M.close()
 
 				###
-				### Plotting Routine
+				### Plotting and Processing Routine
 				###
 
 				### Define data
-				MHM_log_M	=	open("%s/MHM_log_M.txt"%(path()),"r")
-				M,time	=	np.loadtxt(MHM_log_M , delimiter="\t" , usecols=(0,1), unpack=True)
-				timeFmtd  = []
+				MHM_log_M		=	open("%s/MHM_log_M.txt"%(path()),"r")
+				M,time,logTime	=	np.loadtxt(MHM_log_M , delimiter="\t" , usecols=(0,1,2), unpack=True)
+
+				### Format time into datetime ( : "dt" ) objects
+				time_dt  = []
 				if isinstance(time, np.float64):
 					item = time
 					time = []
 					time.append(item)
 				for j in range(0,len(time)) :
-					timeFmtd.append(dt.datetime.fromtimestamp(time[j]))
+					time_dt.append(dt.datetime.fromtimestamp(time[j]))
+
+				### Form Derivative Data
+				max_ = maxIndex(time_dt)
+				dMAvgList = []
+				for o in range(0,len(time_dt)):		# For each data point -- UNOPTIMIZED -- Change: Remove earliest, append new
+					dMAvg = 0
+					dMCount = 0
+					for e in range(0,o):			# Calculate rolling average derivative at event "e" with prior events
+						if ( time_dt[e] >= (time_dt[o]-dtd(days=par.dM_dayRange)) ) :
+							dM = d(M,time,e,1)
+							if (dM != 999.321) :
+								dMAvg = dMAvg + dM
+								dMCount = dMCount +1
+					if (dMCount != 0) :
+						dMAvg = dMAvg/dMCount
+					if (dMCount == 0) :
+						dMAvg = 0
+					dMAvgList.append(dMAvg)
+
+				### Rebuild expanded ( : "exp" ) log -- UNOPTIMIZED -- Change: Only update, not rebuild
+				open("%s/MHM_log_M_exp.txt"%(path()), 'w').close()
+				MHM_log_M_exp = open("%s/MHM_log_M_exp.txt"%(path()),"a+")
+				for k in range(0,len(M)):
+					MHM_log_M_exp.write("%f\t%f\t%f\t%f\t\n"%(M[k],time[k],dMAvgList[k],logTime[k]))
+				MHM_log_M_exp.close()
 
 				### Build plotting object
-				saved,drawn = plt.subplots()
-				drawn.plot(timeFmtd , M , label='Earthly Gravitational Force [lbs]')
+				canvas,drawn = plt.subplots(figsize=(8,5))
+				plt.subplots_adjust(bottom=0.15)
 
-				### Format
-				# Major, minor tick marks
+				### Label plotting object
+				today = dt.datetime.now()
+				plt.title('Macroscopic Health Management')
+				plt.xlabel('Day of Year %s [day]'%(today.year))
+				
+				### Draw primary parameter of plotting object
+				drawn.tick_params('both' , length=7 , which='major')
+				drawn.plot(time_dt , M , 'b-')
+				drawn.set_ylabel('Weight [lbs]' , color='blue')
+				# [[ No ylim set ]]
+
+				### Draw derivative parameter of plotting object
+				drawnDeriv = drawn.twinx()
+				drawnDeriv.tick_params('both' , length=7 , which='major')
+				drawnDeriv.plot(time_dt , dMAvgList , 'g-')
+				drawnDeriv.set_ylabel('Change in Weight [lbs/day]' , color="green")
+				drawnDeriv.set_ylim(-3,3)
+
+				### Format horizontal axis of plotting object
+				plt.setp(drawn.get_xticklabels() , rotation='35')
 				daily = dates.DayLocator()
 				hourly = aml()
-				dailyFormat = dates.DateFormatter('%Y %b %d')
+				dailyFormat = dates.DateFormatter('%b%d')
 				drawn.xaxis.set_major_locator(daily)
 				drawn.xaxis.set_major_formatter(dailyFormat)
 				drawn.xaxis.set_minor_locator(hourly)
-				# Plot time range
-				today = dt.datetime.now()
-				prior = today - d(days=par.plotTimeRange)
+				prior = today - dtd(days=par.plotTimeRange)
 				timeMax = dt.date(today.year , today.month , today.day)
 				timeMin = dt.date(prior.year , prior.month , prior.day)
 				drawn.set_xlim(timeMin,timeMax)
-				# Tick mark labels
-				saved.autofmt_xdate()
-				# Legend and axes
-				plt.legend(loc='best', fancybox=True, framealpha=.5)
-				plt.xlabel('Date [day]')
-				plt.ylabel('Macroscopic Health Monitoring')
 
-				### Draw weight goal
-				plt.axhline(linewidth=50 , y=par.M_goal , color='#00ff00', alpha=0.5)
+				### Draw primary parameter limit within plotting object
+				drawn.axhline(y=par.M_goal , linewidth=10 , color='#00ff00', alpha=0.5)
+
+				### Draw [ dM/dt = 0 ] line
+				drawnDeriv.axhline(y=0 , linewidth=1 , color='#000000', alpha=0.5)				
 
 				### Save drawn image and clear drawing frame
 				plt.savefig('%s/MHM_plot_M.png'%(path()))
@@ -264,3 +341,12 @@ while 1:
 	t.sleep(5)
 	print "[ MHM Operating ][ Uptime = %fhours ]"%((t.time()-initialTimeStamp)/(60*60))
 	par = reload(par)
+
+###
+###	Features to add:
+###
+###		-	Develop and implement Smoothing and Interpolation function
+###		-	Goal line tolerance
+###		-	Add [Software Redundancy]
+###		-	Optimize for software performance
+###
