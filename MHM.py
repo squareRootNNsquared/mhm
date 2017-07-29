@@ -326,7 +326,7 @@ while 1:
 				drawnDeriv = drawn.twinx()
 				drawnDeriv.tick_params('both' , length=7 , which='major')
 				drawnDeriv.plot(time_dt , dMAvgList , 'g-')
-				drawnDeriv.set_ylabel('Change in Weight [lbs/day]' , color="green")
+				drawnDeriv.set_ylabel('%d Day Average of Change in Weight [lbs/day]'%(par.dM_dayRange) , color="green")
 				drawnDeriv.set_ylim(-3,3)
 
 				### Format horizontal axis of plotting object
@@ -338,7 +338,7 @@ while 1:
 				drawn.xaxis.set_major_formatter(dailyFormat)
 				drawn.xaxis.set_minor_locator(hourly)
 				prior = today - dtd(days=par.plotTimeRange)
-				timeMax = dt.date(today.year , today.month , today.day)
+				timeMax = dt.date(today.year , today.month , today.day+1)
 				timeMin = dt.date(prior.year , prior.month , prior.day)
 				drawn.set_xlim(timeMin,timeMax)
 
