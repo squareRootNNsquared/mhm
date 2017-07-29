@@ -30,7 +30,7 @@
 ###						M 	-	mass
 ###
 ###
-###		Known Bug	[1]	Will log most recent input (perhaps again) when program is started.
+###		Known Bug	[1]	Will perform most recent command (perhaps again) when program is started.
 ###
 ###		Warning	[1]	Reports close (>1s) in time proximity to a recent report may be ignored.
 ###		Warning [2] Data plotted with order corresponding to log.
@@ -55,6 +55,7 @@ from email.mime.image import MIMEImage
 import smtplib
 import time as t
 import numpy as np
+import math
 import matplotlib.pyplot as plt
 import matplotlib.pylab as pl
 import matplotlib.dates as dates
@@ -88,21 +89,27 @@ def d(list_a,list_b,index,secToDay):
 	###		If an index is not obtainable a value of zero is returned indicating that 
 	###		no change is calculable at the index provided.
 	###
-	###		If secToDay is set to 1, b is assumed to be of the dimension of time in
+	###		If secToDay is set to 1, _b is assumed to be of the dimension of time in
 	###		the SI unit of seconds, and will be converted to the unit of days.
 	###
-	###		A return of 999.321 indicates an index handling error and data is invalid.
+	###		A return of errFlag indicates an index handling error or a change in _b of
+	###		zero and data is deemed invalid.
 	###
+	errFlag = 999.321
 	try :
 		if ((index-1) >= 0) :
-			if (secToDay != 1) :
-				d = (list_a[index]-list_a[index-1])/(list_b[index]-list_b[index-1])
-			if (secToDay == 1) :
-				d = (list_a[index]-list_a[index-1])/( (list_b[index]-list_b[index-1])/(60*60*24) )
+			numerator 	= (list_a[index]-list_a[index-1])
+			denominator	= (list_b[index]-list_b[index-1])
+			if (denominator == 0) :
+				d = errFlag
+			if (secToDay != 1)&(denominator != 0) :
+				d = numerator/denominator
+			if (secToDay == 1)&(denominator != 0) :
+				d = numerator/( denominator/(60*60*24) )
 		if ((index-1) < 0) :
-			d = 999.321
+			d = errFlag
 	except IndexError :
-		d = 999.321
+		d = errFlag
 	return d
 
 def maxIndex(list):
@@ -268,7 +275,7 @@ while 1:
 				for o in range(0,len(time_dt)):		# For each data point -- UNOPTIMIZED -- Change: Remove earliest, append new
 					dMAvg = 0
 					dMCount = 0
-					for e in range(0,o):			# Calculate rolling average derivative at event "e" with prior events
+					for e in range(0,(o+1)):		# Calculate rolling average derivative at event "o" with prior events
 						if ( time_dt[e] >= (time_dt[o]-dtd(days=par.dM_dayRange)) ) :
 							dM = d(M,time,e,1)
 							if (dM != 999.321) :
@@ -283,6 +290,19 @@ while 1:
 				### Rebuild expanded ( : "exp" ) log -- UNOPTIMIZED -- Change: Only update, not rebuild
 				open("%s/MHM_log_M_exp.txt"%(path()), 'w').close()
 				MHM_log_M_exp = open("%s/MHM_log_M_exp.txt"%(path()),"a+")
+				if isinstance(M, np.float64):
+					item = M
+					M = []
+					M.append(item)
+				if not (isinstance(logTime, list)) :
+					item = logTime
+					logTime = []
+					logTime.append(item)
+				if not (isinstance(logTime[0], float)) :
+					logTime = logTime[0]
+				for m in range(0,len(dMAvgList)):
+					if (math.isnan(dMAvgList[m])) :
+						dMAvgList[m] = 0.0
 				for k in range(0,len(M)):
 					MHM_log_M_exp.write("%f\t%f\t%f\t%f\t\n"%(M[k],time[k],dMAvgList[k],logTime[k]))
 				MHM_log_M_exp.close()
@@ -339,7 +359,7 @@ while 1:
 
 	### End Of Routine operations
 	t.sleep(5)
-	print "[ MHM Operating ][ Uptime = %fhours ]"%((t.time()-initialTimeStamp)/(60*60))
+	print "[ MHM Operating ][ Uptime = %fminutes ]"%((t.time()-initialTimeStamp)/(60))
 	par = reload(par)
 
 ###
@@ -349,4 +369,5 @@ while 1:
 ###		-	Goal line tolerance
 ###		-	Add [Software Redundancy]
 ###		-	Optimize for software performance
+###		-	Verify email before program can be utilized against user list
 ###
