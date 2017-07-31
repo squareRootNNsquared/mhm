@@ -104,7 +104,7 @@ def d(list_a,list_b,index,secToDay):
 				d = numerator/denominator
 			if (secToDay == 1)&(denominator != 0) :
 				denominator = denominator/(60*60*24)
-				d = numerator/( denominator/(60*60*24) )
+				d = numerator/denominator
 		if ((index-1) < 0) :
 			d = errFlag
 	except IndexError :
