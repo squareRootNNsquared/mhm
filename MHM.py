@@ -58,6 +58,7 @@ import matplotlib.dates as dates
 from matplotlib.ticker import AutoMinorLocator as aml
 import datetime as dt
 from datetime import timedelta as dtd
+import logging
 
 
 ###
@@ -208,195 +209,234 @@ def getFirstTextBlock(self, email_message_instance):
 	elif maintype == 'text':
 		return email_message_instance.get_payload()
 
+def R():
+	### Non-returning function that restarts current-running python script
+	cur = sys.executable
+	os.execl(cur, cur, * sys.argv)
+
 ###
 ###	Operational Loop
 ###
+
 while 1:
 
-	###
-	### Data Acquisition
-	###
+	try :
 
-	###	Log into inbox of mailbox
-	MHM_mail = imaplib.IMAP4_SSL(par.em_imap)
-	MHM_mail.login(par.em_ac,par.em_pw)
-	MHM_mail.select('INBOX')
+		###
+		### Data Acquisition
+		###
 
-	### Retrieve unread email IDs
-	status, response = MHM_mail.search(None,'(UNSEEN)')
-	unreadList = response[0].split()
+		###	Log into inbox of mailbox
+		MHM_mail = imaplib.IMAP4_SSL(par.em_imap)
+		MHM_mail.login(par.em_ac,par.em_pw)
+		MHM_mail.select('INBOX')
 
-	### If there is unaccessed data, continue to proccess
-	###		NOTE: [[ Each process, uncluding a NULL thereof, will perform a marking I/A ]]
-	if (len(unreadList) != 0) :
-		for ID_current in unreadList :
-			
-			### Fetch raw email
-			sResult, data	=	MHM_mail.uid('fetch',ID_current,'(RFC822)')
-			latestEmail_raw	=	data[0][1]
+		### Retrieve unread email IDs
+		status, response = MHM_mail.search(None,'(UNSEEN)')
+		unreadList = response[0].split()
 
-			### Parse most recent, raw email
-			latestEmail			=	email.message_from_string(latestEmail_raw)
-			latestEmail_sender	=	email.utils.parseaddr(latestEmail['From'])[1]
-			latestEmail_body 	= 	getFirstTextBlock('',latestEmail)
-			latestEmail_time	=	t.mktime(email.utils.parsedate(latestEmail['Date']))
-			if (latestEmail_time > emailTimeKeeper) :
-				emailTimeKeeper = latestEmail_time
-				data = latestEmail_body.split(" ")
-				for i in range(0,len(data)):
+		### If there is unaccessed data, continue to proccess
+		###		NOTE: [[ Each process, uncluding a NULL thereof, will perform a marking I/A ]]
+		if (len(unreadList) != 0) :
+			for ID_current in unreadList :
+				
+				### Fetch raw email
+				sResult, data	=	MHM_mail.uid('fetch',ID_current,'(RFC822)')
+				latestEmail_raw	=	data[0][1]
 
-					###
-					###	MHM_M Operation
-					###
-
-					### If M value in retrieved data
-					if ("R~M" in str(data[i])) :
-						
-						###	Data Interpretation
-						data_M = eval(data[i].strip("R~M"))
-						data_M = float(data_M)
-						MHM_log_M	=	open("%s/MHM_log_M.txt"%(path()),"a+")
-						MHM_log_M.write("%f\t%f\t%f\n"%(data_M,latestEmail_time,t.time()))
-						MHM_log_M.close()
-
-						### Flag data on server as seen 
-						MHM_mail.store(ID_current , '+FLAGS' , '\Seen')
+				### Parse most recent, raw email
+				latestEmail			=	email.message_from_string(latestEmail_raw)
+				latestEmail_sender	=	email.utils.parseaddr(latestEmail['From'])[1]
+				latestEmail_body 	= 	getFirstTextBlock('',latestEmail)
+				latestEmail_time	=	t.mktime(email.utils.parsedate(latestEmail['Date']))
+				if (latestEmail_time > emailTimeKeeper) :
+					emailTimeKeeper = latestEmail_time
+					data = latestEmail_body.split(" ")
+					for i in range(0,len(data)):
 
 						###
-						### Plotting and Processing Routine
+						###	MHM_M Operation
 						###
 
-						### Define data
-						MHM_log_M		=	open("%s/MHM_log_M.txt"%(path()),"r")
-						M,time,logTime	=	np.loadtxt(MHM_log_M , delimiter="\t" , usecols=(0,1,2), unpack=True)
+						### If M value in retrieved data
+						if ("R~M" in str(data[i])) :
+							
+							###	Data Interpretation
+							data_M = eval(data[i].strip("R~M"))
+							data_M = float(data_M)
+							MHM_log_M	=	open("%s/MHM_log_M.txt"%(path()),"a+")
+							MHM_log_M.write("%f\t%f\t%f\n"%(data_M,latestEmail_time,t.time()))
+							MHM_log_M.close()
 
-						### Format time into datetime ( : "dt" ) objects
-						time_dt  = []
-						if isinstance(time, np.float64):
-							item = time
-							time = []
-							time.append(item)
-						for j in range(0,len(time)) :
-							time_dt.append(dt.datetime.fromtimestamp(time[j]))
+							### Flag data on server as seen 
+							MHM_mail.store(ID_current , '+FLAGS' , '\Seen')
 
-						### Form Derivative Data
-						max_ = maxIndex(time_dt)
-						dMAvgList = []
-						for o in range(0,len(time_dt)):		# For each data point -- UNOPTIMIZED -- Change: Remove earliest, append new
-							dMAvg = 0
-							dTime = 0
-							for e in range(0,(o+1)):		# Calculate rolling average derivative at event "o" with prior events
-								if ( time_dt[e] >= (time_dt[o]-dtd(days=par.dM_dayRange)) ) :
-									dM = d(M,time,e,1)
-									if (dM[0] != 999.321) :
-										dMAvg = dMAvg + dM[0]
-										if (dM[2] != 999.321) :
-											dTime = dTime + dM[2]
-							if (dTime != 0) :
-								dMAvg = dMAvg/dTime
-							if (dTime == 0) :
+							###
+							### Plotting and Processing Routine
+							###
+
+							### Define data
+							MHM_log_M		=	open("%s/MHM_log_M.txt"%(path()),"r")
+							M,time,logTime	=	np.loadtxt(MHM_log_M , delimiter="\t" , usecols=(0,1,2), unpack=True)
+
+							### Format time into datetime ( : "dt" ) objects
+							time_dt  = []
+							if isinstance(time, np.float64):
+								item = time
+								time = []
+								time.append(item)
+							for j in range(0,len(time)) :
+								time_dt.append(dt.datetime.fromtimestamp(time[j]))
+
+							### Form Derivative Data
+							max_ = maxIndex(time_dt)
+							dMAvgList = []
+							for o in range(0,len(time_dt)):		# For each data point -- UNOPTIMIZED -- Change: Remove earliest, append new
 								dMAvg = 0
-							dMAvgList.append(dMAvg)
+								dTime = 0
+								for e in range(0,(o+1)):		# Calculate rolling average derivative at event "o" with prior events
+									if ( time_dt[e] >= (time_dt[o]-dtd(days=par.dM_dayRange)) ) :
+										dM = d(M,time,e,1)
+										if (dM[0] != 999.321) :
+											dMAvg = dMAvg + dM[0]
+											if (dM[2] != 999.321) :
+												dTime = dTime + dM[2]
+								if (dTime != 0) :
+									dMAvg = dMAvg/dTime
+								if (dTime == 0) :
+									dMAvg = 0
+								dMAvgList.append(dMAvg)
 
-						### Rebuild expanded ( : "exp" ) log -- UNOPTIMIZED -- Change: Only update, not rebuild
-						open("%s/MHM_log_M_exp.txt"%(path()), 'w').close()
-						MHM_log_M_exp = open("%s/MHM_log_M_exp.txt"%(path()),"a+")
-						if isinstance(M, np.float64):
-							item = M
-							M = []
-							M.append(item)
-						if not (isinstance(logTime, list)) :
-							item = logTime
-							logTime = []
-							logTime.append(item)
-						if not (isinstance(logTime[0], float)) :
-							logTime = logTime[0]
-						for m in range(0,len(dMAvgList)):
-							if (math.isnan(dMAvgList[m])) :
-								dMAvgList[m] = 0.0
-						for k in range(0,len(M)):
-							MHM_log_M_exp.write("%f\t%f\t%f\t%f\t\n"%(M[k],time[k],dMAvgList[k],logTime[k]))
-						MHM_log_M_exp.close()
+							### Rebuild expanded ( : "exp" ) log -- UNOPTIMIZED -- Change: Only update, not rebuild
+							open("%s/MHM_log_M_exp.txt"%(path()), 'w').close()
+							MHM_log_M_exp = open("%s/MHM_log_M_exp.txt"%(path()),"a+")
+							if isinstance(M, np.float64):
+								item = M
+								M = []
+								M.append(item)
+							if not (isinstance(logTime, list)) :
+								item = logTime
+								logTime = []
+								logTime.append(item)
+							if not (isinstance(logTime[0], float)) :
+								logTime = logTime[0]
+							for m in range(0,len(dMAvgList)):
+								if (math.isnan(dMAvgList[m])) :
+									dMAvgList[m] = 0.0
+							for k in range(0,len(M)):
+								MHM_log_M_exp.write("%f\t%f\t%f\t%f\t\n"%(M[k],time[k],dMAvgList[k],logTime[k]))
+							MHM_log_M_exp.close()
 
-						### Build plotting object
-						canvas,drawn = plt.subplots(figsize=(8,5))
-						plt.subplots_adjust(bottom=0.15)
+							### Build plotting object
+							canvas,drawn = plt.subplots(figsize=(8,5))
+							plt.subplots_adjust(bottom=0.15)
 
-						### Label plotting object
-						today = dt.datetime.now()
-						plt.title('Macroscopic Health Management')
-						plt.xlabel('Day of Year %s [day]'%(today.year))
+							### Label plotting object
+							today = dt.datetime.now()
+							plt.title('Macroscopic Health Management')
+							plt.xlabel('Day of Year %s [day]'%(today.year))
+							
+							### Draw primary parameter of plotting object
+							drawn.tick_params('both' , length=7 , which='major')
+							drawn.plot(time_dt , M , 'b-')
+							drawn.set_ylabel('Weight [lbs]' , color='blue')
+
+							### Draw derivative parameter of plotting object
+							drawnDeriv = drawn.twinx()
+							drawnDeriv.tick_params('both' , length=7 , which='major')
+							drawnDeriv.plot(time_dt , dMAvgList , 'g-')
+							drawnDeriv.set_ylabel('%d Day Time-Average of Change [lbs/day]'%(par.dM_dayRange) , color="green")
+							drawnDeriv.set_ylim(-3,3)
+
+							### Format horizontal axis of plotting object
+							tomorrow = dt.datetime.fromtimestamp(t.time()+(24*60*60))
+							plt.setp(drawn.get_xticklabels() , rotation='35')
+							daily = dates.DayLocator()
+							hourly = aml()
+							dailyFormat = dates.DateFormatter('%b%d')
+							drawn.xaxis.set_major_locator(daily)
+							drawn.xaxis.set_major_formatter(dailyFormat)
+							drawn.xaxis.set_minor_locator(hourly)
+							prior = today - dtd(days=par.plotTimeRange)
+							timeMax = dt.date(tomorrow.year , tomorrow.month , tomorrow.day)
+							timeMin = dt.date(prior.year , prior.month , prior.day)
+							drawn.set_xlim(timeMin,timeMax)
+
+							### Draw primary parameter target within plotting object
+							drawn.axhline(y=par.M_goal , linewidth=10 , color='#00ff00', alpha=0.25)
+
+							### Draw derivative parameter zero ( dM/dt = 0 ) line
+							drawnDeriv.axhline(y=0 , linewidth=1 , color='#000000', alpha=0.25)				
+
+							### Save drawn image and clear drawing frame
+							plt.savefig('%s/MHM_plot_M.png'%(path()))
+							plt.clf()
+							plt.cla()
+
+						###
+						###	MHM_DataDelivery Operation
+						###
+
+						### If data request in retrieved data, send plot ###
+						if ("RD~M" in str(data[i])):
+
+							### Delivery data
+							sendEmail("MHM Plot Delivery","M[T]",par.dataRecipient,"%s/MHM_plot_M.png"%(path()))
+
+							### Flag data on server as seen 
+							MHM_mail.store(ID_current , '+FLAGS' , '\Seen')
+
+						###
+						###	MHM_Status Operation
+						###
+
+						### If status request in retrieved data, send plot ###
+						if ("RS" in str(data[i])):
+
+							### Delivery data
+							sendEmail("MHM Status Report","Fantastic!",par.dataRecipient,"")
+
+							### Flag data on server as seen 
+							MHM_mail.store(ID_current , '+FLAGS' , '\Seen')
+
+						###
+						###	MHM_NULL Operation
+						###
 						
-						### Draw primary parameter of plotting object
-						drawn.tick_params('both' , length=7 , which='major')
-						drawn.plot(time_dt , M , 'b-')
-						drawn.set_ylabel('Weight [lbs]' , color='blue')
-						# [[ No ylim set ]]
-
-						### Draw derivative parameter of plotting object
-						drawnDeriv = drawn.twinx()
-						drawnDeriv.tick_params('both' , length=7 , which='major')
-						drawnDeriv.plot(time_dt , dMAvgList , 'g-')
-						drawnDeriv.set_ylabel('%d Day Time-Average of Change [lbs/day]'%(par.dM_dayRange) , color="green")
-						drawnDeriv.set_ylim(-3,3)
-
-						### Format horizontal axis of plotting object
-						tomorrow = dt.datetime.fromtimestamp(t.time()+(24*60*60))
-						plt.setp(drawn.get_xticklabels() , rotation='35')
-						daily = dates.DayLocator()
-						hourly = aml()
-						dailyFormat = dates.DateFormatter('%b%d')
-						drawn.xaxis.set_major_locator(daily)
-						drawn.xaxis.set_major_formatter(dailyFormat)
-						drawn.xaxis.set_minor_locator(hourly)
-						prior = today - dtd(days=par.plotTimeRange)
-						timeMax = dt.date(tomorrow.year , tomorrow.month , tomorrow.day)
-						timeMin = dt.date(prior.year , prior.month , prior.day)
-						drawn.set_xlim(timeMin,timeMax)
-
-						### Draw primary parameter limit within plotting object
-						drawn.axhline(y=par.M_goal , linewidth=10 , color='#00ff00', alpha=0.25)
-
-						### Draw [ dM/dt = 0 ] line
-						drawnDeriv.axhline(y=0 , linewidth=1 , color='#000000', alpha=0.25)				
-
-						### Save drawn image and clear drawing frame
-						plt.savefig('%s/MHM_plot_M.png'%(path()))
-						plt.clf()
-						plt.cla()
-
-					###
-					###	MHM_DataDelivery Operation
-					###
-
-					### If data request in retrieved data, send plot ###
-					if ("RD~M" in str(data[i])):
-
-						### Delivery data
-						sendEmail("MHM Plot Delivery","M[T]",par.dataRecipient,"%s/MHM_plot_M.png"%(path()))
-
 						### Flag data on server as seen 
 						MHM_mail.store(ID_current , '+FLAGS' , '\Seen')
 
-					###
-					###	MHM_NULL Operation
-					###
-					
-					### Flag data on server as seen 
-					MHM_mail.store(ID_current , '+FLAGS' , '\Seen')
+		### End Of Routine operations
+		t.sleep(10)
+		print "[ MHM Operating ][ Uptime = %fminutes ]"%((t.time()-initialTimeStamp)/(60))
+		par = reload(par)
 
-	### End Of Routine operations
-	t.sleep(10)
-	print "[ MHM Operating ][ Uptime = %fminutes ]"%((t.time()-initialTimeStamp)/(60))
-	par = reload(par)
+	except Exception as err :
 
-###
-###	Features to add:
-###
-###		-	emailTimeKeeper needs to be non-volatized
-###		-	Develop and implement Smoothing and Interpolation function
-###		-	Goal line tolerance
-###		-	Add [Software Redundancy]
-###		-	Optimize for software performance
-###		-	Verify email before program can be utilized against user list
-###
+		###	Increment non-volatile error count
+		MHM_errCount = open("%s/MHM_errCount.txt"%(path()),"a+")
+		MHM_errCount.write("x")
+		MHM_errCount.close()
+
+		###	Count errors
+		MHM_errCount = open("%s/MHM_errCount.txt"%(path()),"r")
+		errors = ""
+		for line in MHM_errCount:
+			errors = line
+		MHM_errCount.close()
+
+		### If error threshhold exceeded : clear error count, write detailed log, terminate application 
+		errorThreshhold = 9
+		if (len(errors) > errorThreshhold) :
+			MHM_errCount = open("%s/MHM_errCount.txt"%(path()),"w")
+			logging.getLogger('').handlers = []
+			logging.basicConfig(level=logging.ERROR, filename='%s/MHM_errLogDetailed.txt'%(path()), filemode='a+')
+			logging.exception("")
+			sys.exit("[ MHM Critical Repeated Failure ][ Failure Data Logged ]")			
+
+		### If error threshhold not exceeded : write small (not detailed) log, wait, restart application
+		MHM_errLogSmall = open("%s/MHM_errLogSmall.txt"%(path()),"a+")
+		MHM_errLogSmall.write("%s\t%f\n"%(err,t.time()))
+		MHM_errLogSmall.close()
+		t.sleep(10)
+		R()
