@@ -406,11 +406,17 @@ while 1:
 						### Flag data on server as seen 
 						MHM_mail.store(ID_current , '+FLAGS' , '\Seen')
 
-		### End Of Routine operations
+		### End Of Routine (EOR) operations
+		upMinutes = (t.time()-initialTimeStamp)/(60.0)
+		upHours = upMinutes/60.0
+		upDays = upHours/24.0
+		if (upDays > 1.0) :
+			MHM_errCount = open("%s/MHM_errCount.txt"%(path()),"w")
+			MHM_errCount.close()
+		print "[ MHM Operating ][ Uptime = {%fminutes \/ %fhours \/ %fdays} ]"%(upMinutes,upHours,upDays)
 		t.sleep(10)
-		print "[ MHM Operating ][ Uptime = %fminutes ]"%((t.time()-initialTimeStamp)/(60))
 		par = reload(par)
-
+		
 	except Exception as err :
 
 		###	Increment non-volatile error count
